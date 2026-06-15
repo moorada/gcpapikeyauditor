@@ -83,6 +83,9 @@ async function doDirectRequest(url, options) {
 }
 
 async function doBackendRequest(url, options) {
+  const extraHeaders = options?.headers ? Object.fromEntries(
+    Object.entries(options.headers).filter(([k]) => k.toLowerCase() !== 'content-type')
+  ) : null;
   const res = await fetch(`${activeBackendUrl}/probe`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -90,6 +93,7 @@ async function doBackendRequest(url, options) {
       url,
       method: options?.method || 'GET',
       body: options?.body ?? null,
+      headers: extraHeaders,
     }),
   });
   if (!res.ok) throw new Error(`Backend error: ${res.status}`);
@@ -152,6 +156,37 @@ function doMapsRequest(url, signal) {
 }
 
 // ── API test definitions ───────────────────────────────
+
+// ── Early parsers needed by test definitions ───────────
+
+function parseImageResponse(raw) {
+  if (raw.ok) {
+    return { status: 'accessible', severity: 'high', summary: 'Endpoint reachable — content served successfully', details: `HTTP ${raw.statusCode}` };
+  }
+  return parseGoogleStyleResponse(raw);
+}
+
+function parseTimezoneResponse(raw) {
+  if (!raw.body) return parseGoogleStyleResponse(raw);
+  const body = raw.body;
+  if (body.status === 'OK') {
+    return { status: 'accessible', severity: 'high', summary: 'Endpoint reachable with this key', details: body.timeZoneName || body.timeZoneId || 'OK' };
+  }
+  if (body.status === 'REQUEST_DENIED') {
+    return classifyFromMessage(body.errorMessage || body.error_message || 'REQUEST_DENIED', raw.statusCode);
+  }
+  return parseGoogleStyleResponse(raw);
+}
+
+function parseFcmResponse(raw) {
+  if (raw.ok && raw.body?.multicast_id !== undefined) {
+    return { status: 'accessible', severity: 'high', summary: 'FCM API accessible — push notifications can be sent to registered devices', details: `Accepted key; failure count reflects invalid test token, not key validity` };
+  }
+  if (raw.statusCode === 401) {
+    return { status: 'not_enabled', severity: 'low', summary: 'FCM key not authorized', details: 'Key rejected by FCM — Firebase Cloud Messaging may not be enabled for this project' };
+  }
+  return parseGoogleStyleResponse(raw);
+}
 
 const API_TESTS = [
   // ── Maps ──────────────────────────────────────────────
@@ -222,6 +257,248 @@ const API_TESTS = [
       ),
     parser: parseMapsStyleResponse,
   },
+  {
+    id: 'maps-staticmap',
+    name: 'Static Maps API',
+    category: 'Maps',
+    severity: 'medium',
+    impact: 'Map image generation at scale generates sustained billable traffic. $2 per 1,000 requests.',
+    pocMethod: 'GET',
+    pocUrl: 'https://maps.googleapis.com/maps/api/staticmap?center=45,10&zoom=7&size=400x400&key={KEY}',
+    pocBody: null,
+    request: (key, signal) =>
+      doRequest(`https://maps.googleapis.com/maps/api/staticmap?center=45,10&zoom=7&size=400x400&key=${encodeURIComponent(key)}`, { method: 'GET', signal }),
+    parser: parseImageResponse,
+  },
+  {
+    id: 'maps-streetview',
+    name: 'Street View Static API',
+    category: 'Maps',
+    severity: 'medium',
+    impact: 'Street-level imagery access can be abused for automated visual reconnaissance. $7 per 1,000 requests.',
+    pocMethod: 'GET',
+    pocUrl: 'https://maps.googleapis.com/maps/api/streetview?size=400x400&location=40.720032,-73.988354&key={KEY}',
+    pocBody: null,
+    request: (key, signal) =>
+      doRequest(`https://maps.googleapis.com/maps/api/streetview?size=400x400&location=40.720032,-73.988354&fov=90&heading=235&pitch=10&key=${encodeURIComponent(key)}`, { method: 'GET', signal }),
+    parser: parseImageResponse,
+  },
+  {
+    id: 'places-autocomplete',
+    name: 'Places Autocomplete API',
+    category: 'Maps',
+    severity: 'medium',
+    impact: 'Bulk address autocomplete for geodata extraction. $2.83 per 1,000 requests; $17 per 1,000 per-session.',
+    pocMethod: 'GET',
+    pocUrl: 'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Bingh&types=(cities)&key={KEY}',
+    pocBody: null,
+    clientNote: 'JSONP',
+    request: (key, signal) =>
+      doMapsRequest(`https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Bingh&types=%28cities%29&key=${encodeURIComponent(key)}`, signal),
+    parser: parseMapsStyleResponse,
+  },
+  {
+    id: 'places-details',
+    name: 'Place Details API',
+    category: 'Maps',
+    severity: 'medium',
+    impact: 'Place detail extraction enables bulk POI data harvesting including phone numbers and hours. $17 per 1,000 requests.',
+    pocMethod: 'GET',
+    pocUrl: 'https://maps.googleapis.com/maps/api/place/details/json?place_id=ChIJN1t_tDeuEmsRUsoyG83frY4&fields=name,rating,formatted_phone_number&key={KEY}',
+    pocBody: null,
+    clientNote: 'JSONP',
+    request: (key, signal) =>
+      doMapsRequest(`https://maps.googleapis.com/maps/api/place/details/json?place_id=ChIJN1t_tDeuEmsRUsoyG83frY4&fields=name,rating,formatted_phone_number&key=${encodeURIComponent(key)}`, signal),
+    parser: parseMapsStyleResponse,
+  },
+  {
+    id: 'places-nearbysearch',
+    name: 'Places Nearby Search API',
+    category: 'Maps',
+    severity: 'high',
+    impact: 'Nearby business search enables large-scale geospatial scraping and competitor intelligence extraction. $32 per 1,000 requests.',
+    pocMethod: 'GET',
+    pocUrl: 'https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=-33.8670522,151.1957362&radius=100&types=food&key={KEY}',
+    pocBody: null,
+    clientNote: 'JSONP',
+    request: (key, signal) =>
+      doMapsRequest(`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=-33.8670522,151.1957362&radius=100&types=food&name=harbour&key=${encodeURIComponent(key)}`, signal),
+    parser: parseMapsStyleResponse,
+  },
+  {
+    id: 'places-textsearch',
+    name: 'Places Text Search API',
+    category: 'Maps',
+    severity: 'high',
+    impact: 'Text-based business search can drain daily quota through automated scraping pipelines. $32 per 1,000 requests.',
+    pocMethod: 'GET',
+    pocUrl: 'https://maps.googleapis.com/maps/api/place/textsearch/json?query=restaurants+in+Sydney&key={KEY}',
+    pocBody: null,
+    clientNote: 'JSONP',
+    request: (key, signal) =>
+      doMapsRequest(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=restaurants+in+Sydney&key=${encodeURIComponent(key)}`, signal),
+    parser: parseMapsStyleResponse,
+  },
+  {
+    id: 'places-photo',
+    name: 'Places Photo API',
+    category: 'Maps',
+    severity: 'medium',
+    impact: 'Unrestricted photo retrieval from the Google Places database. $7 per 1,000 requests.',
+    pocMethod: 'GET',
+    pocUrl: 'https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=CnRtAAAATLZNl354RwP_9UKbQ_5Psy40texXePv4oAlgP4qNEkdIrkyse7rPXYGd9D_Uj1rVsQdWT4oRz4QrYAJNpFX7rzqqMlZw2h2E2y5IKMUZ7ouD_SlcHxYq1yL4KbKUv3qtWgTK0A6QbGh87GB3sscrHRIQiG2RrmU_jF4tENr9wGS_YxoUSSDrYjWmrNfeEHSGSc3FyhNLlBU&key={KEY}',
+    pocBody: null,
+    request: (key, signal) =>
+      doRequest(`https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=CnRtAAAATLZNl354RwP_9UKbQ_5Psy40texXePv4oAlgP4qNEkdIrkyse7rPXYGd9D_Uj1rVsQdWT4oRz4QrYAJNpFX7rzqqMlZw2h2E2y5IKMUZ7ouD_SlcHxYq1yL4KbKUv3qtWgTK0A6QbGh87GB3sscrHRIQiG2RrmU_jF4tENr9wGS_YxoUSSDrYjWmrNfeEHSGSc3FyhNLlBU&key=${encodeURIComponent(key)}`, { method: 'GET', signal }),
+    parser: parseImageResponse,
+  },
+  {
+    id: 'maps-elevation',
+    name: 'Elevation API',
+    category: 'Maps',
+    severity: 'low',
+    impact: 'Elevation data for coordinates can be abused for bulk terrain analysis. $5 per 1,000 requests.',
+    pocMethod: 'GET',
+    pocUrl: 'https://maps.googleapis.com/maps/api/elevation/json?locations=39.7391536,-104.9847034&key={KEY}',
+    pocBody: null,
+    clientNote: 'JSONP',
+    request: (key, signal) =>
+      doMapsRequest(`https://maps.googleapis.com/maps/api/elevation/json?locations=39.7391536,-104.9847034&key=${encodeURIComponent(key)}`, signal),
+    parser: parseMapsStyleResponse,
+  },
+  {
+    id: 'maps-timezone',
+    name: 'Timezone API',
+    category: 'Maps',
+    severity: 'low',
+    impact: 'Timezone lookups for arbitrary coordinates. $5 per 1,000 requests.',
+    pocMethod: 'GET',
+    pocUrl: 'https://maps.googleapis.com/maps/api/timezone/json?location=39.6034810,-119.6822510&timestamp=1331161200&key={KEY}',
+    pocBody: null,
+    clientNote: 'JSONP',
+    request: (key, signal) =>
+      doMapsRequest(`https://maps.googleapis.com/maps/api/timezone/json?location=39.6034810,-119.6822510&timestamp=1331161200&key=${encodeURIComponent(key)}`, signal),
+    parser: parseTimezoneResponse,
+  },
+  // ── Roads ─────────────────────────────────────────────
+  {
+    id: 'roads-nearest',
+    name: 'Nearest Roads API',
+    category: 'Roads',
+    severity: 'medium',
+    impact: 'Road segment lookup enables large-scale map data extraction. $10 per 1,000 requests.',
+    pocMethod: 'GET',
+    pocUrl: 'https://roads.googleapis.com/v1/nearestRoads?points=60.170880,24.942795&key={KEY}',
+    pocBody: null,
+    request: (key, signal) =>
+      doRequest(`https://roads.googleapis.com/v1/nearestRoads?points=60.170880,24.942795%7C60.170879,24.942796&key=${encodeURIComponent(key)}`, { method: 'GET', signal }),
+  },
+  {
+    id: 'roads-snaptoroads',
+    name: 'Snap to Roads API',
+    category: 'Roads',
+    severity: 'medium',
+    impact: 'GPS trace snapping to road network at scale generates sustained billable traffic. $10 per 1,000 requests.',
+    pocMethod: 'GET',
+    pocUrl: 'https://roads.googleapis.com/v1/snapToRoads?path=-35.27801,149.12958|-35.28032,149.12907&interpolate=true&key={KEY}',
+    pocBody: null,
+    request: (key, signal) =>
+      doRequest(`https://roads.googleapis.com/v1/snapToRoads?path=-35.27801,149.12958%7C-35.28032,149.12907&interpolate=true&key=${encodeURIComponent(key)}`, { method: 'GET', signal }),
+  },
+  {
+    id: 'roads-speedlimits',
+    name: 'Speed Limits API',
+    category: 'Roads',
+    severity: 'medium',
+    impact: 'Speed limit data for road segments — highest-cost Roads endpoint. $20 per 1,000 requests.',
+    pocMethod: 'GET',
+    pocUrl: 'https://roads.googleapis.com/v1/speedLimits?path=38.75807927603043,-9.03741754643809&key={KEY}',
+    pocBody: null,
+    request: (key, signal) =>
+      doRequest(`https://roads.googleapis.com/v1/speedLimits?path=38.75807927603043,-9.03741754643809&key=${encodeURIComponent(key)}`, { method: 'GET', signal }),
+  },
+  // ── Routes (Next Generation) ───────────────────────────
+  {
+    id: 'routes-compute',
+    name: 'Routes API (computeRoutes)',
+    category: 'Routes',
+    severity: 'medium',
+    impact: 'Next-generation routing with advanced traffic and routing options. Paid per request — successor to Directions API.',
+    pocMethod: 'POST',
+    pocUrl: 'https://routes.googleapis.com/directions/v2:computeRoutes?key={KEY}',
+    pocBody: '{"origin":{"address":"Mountain View, CA"},"destination":{"address":"San Francisco, CA"},"travelMode":"DRIVE"}',
+    request: (key, signal) =>
+      doRequest(`https://routes.googleapis.com/directions/v2:computeRoutes?key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        signal,
+        body: JSON.stringify({ origin: { address: 'Mountain View, CA' }, destination: { address: 'San Francisco, CA' }, travelMode: 'DRIVE' }),
+        headers: { 'Content-Type': 'application/json', 'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters' },
+      }),
+  },
+  {
+    id: 'routes-matrix',
+    name: 'Routes API (computeRouteMatrix)',
+    category: 'Routes',
+    severity: 'medium',
+    impact: 'Multi-origin/destination route matrix. Paid per element — successor to Distance Matrix API.',
+    pocMethod: 'POST',
+    pocUrl: 'https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix?key={KEY}',
+    pocBody: '{"origins":[{"waypoint":{"address":"Mountain View, CA"}}],"destinations":[{"waypoint":{"address":"San Francisco, CA"}}],"travelMode":"DRIVE"}',
+    request: (key, signal) =>
+      doRequest(`https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix?key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        signal,
+        body: JSON.stringify({ origins: [{ waypoint: { address: 'Mountain View, CA' } }], destinations: [{ waypoint: { address: 'San Francisco, CA' } }], travelMode: 'DRIVE' }),
+        headers: { 'Content-Type': 'application/json', 'X-Goog-FieldMask': 'originIndex,destinationIndex,distanceMeters,duration' },
+      }),
+  },
+  // ── Environment ───────────────────────────────────────
+  {
+    id: 'address-validation',
+    name: 'Address Validation API',
+    category: 'Maps',
+    severity: 'medium',
+    impact: 'Postal address validation and standardization at scale. $5 per 1,000 requests.',
+    pocMethod: 'POST',
+    pocUrl: 'https://addressvalidation.googleapis.com/v1:validateAddress?key={KEY}',
+    pocBody: '{"address":{"regionCode":"US","addressLines":["1600 Amphitheatre Pkwy, Mountain View, CA"]}}',
+    request: (key, signal) =>
+      doRequest(`https://addressvalidation.googleapis.com/v1:validateAddress?key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        signal,
+        body: JSON.stringify({ address: { regionCode: 'US', addressLines: ['1600 Amphitheatre Pkwy, Mountain View, CA'] } }),
+        headers: { 'Content-Type': 'application/json' },
+      }),
+  },
+  {
+    id: 'air-quality',
+    name: 'Air Quality API',
+    category: 'Environment',
+    severity: 'low',
+    impact: 'Air quality data for geographic coordinates. Paid per request.',
+    pocMethod: 'POST',
+    pocUrl: 'https://airquality.googleapis.com/v1/currentConditions:lookup?key={KEY}',
+    pocBody: '{"location":{"latitude":37.419734,"longitude":-122.0827784}}',
+    request: (key, signal) =>
+      doRequest(`https://airquality.googleapis.com/v1/currentConditions:lookup?key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        signal,
+        body: JSON.stringify({ location: { latitude: 37.419734, longitude: -122.0827784 } }),
+        headers: { 'Content-Type': 'application/json' },
+      }),
+  },
+  {
+    id: 'aerial-view',
+    name: 'Aerial View API',
+    category: 'Maps',
+    severity: 'low',
+    impact: 'Aerial video metadata for addresses. Paid per request.',
+    pocMethod: 'GET',
+    pocUrl: 'https://aerialview.googleapis.com/v1/videos:lookupVideoMetadata?address=600+Montgomery+St+San+Francisco+CA&key={KEY}',
+    pocBody: null,
+    request: (key, signal) =>
+      doRequest(`https://aerialview.googleapis.com/v1/videos:lookupVideoMetadata?address=600%20Montgomery%20St%2C%20San%20Francisco%2C%20CA%2094111&key=${encodeURIComponent(key)}`, { method: 'GET', signal }),
+  },
   // ── AI / ML ───────────────────────────────────────────
   {
     id: 'gemini',
@@ -237,6 +514,30 @@ const API_TESTS = [
         method: 'GET',
         signal,
       }),
+  },
+  {
+    id: 'gemini-files',
+    name: 'Gemini Files API',
+    category: 'AI',
+    severity: 'high',
+    impact: 'Exposes files uploaded by the project owner — potential leak of sensitive documents and media processed through Gemini.',
+    pocMethod: 'GET',
+    pocUrl: 'https://generativelanguage.googleapis.com/v1beta/files?key={KEY}',
+    pocBody: null,
+    request: (key, signal) =>
+      doRequest(`https://generativelanguage.googleapis.com/v1beta/files?key=${encodeURIComponent(key)}`, { method: 'GET', signal }),
+  },
+  {
+    id: 'gemini-cached',
+    name: 'Gemini Cached Contents API',
+    category: 'AI',
+    severity: 'high',
+    impact: 'Exposes cached/processed Gemini content owned by the project — potential leak of prompts and model inputs.',
+    pocMethod: 'GET',
+    pocUrl: 'https://generativelanguage.googleapis.com/v1beta/cachedContents?key={KEY}',
+    pocBody: null,
+    request: (key, signal) =>
+      doRequest(`https://generativelanguage.googleapis.com/v1beta/cachedContents?key=${encodeURIComponent(key)}`, { method: 'GET', signal }),
   },
   {
     id: 'vision',
@@ -439,6 +740,25 @@ const API_TESTS = [
         }),
         headers: { 'Content-Type': 'application/json' },
       }),
+  },
+  {
+    id: 'fcm',
+    name: 'Firebase Cloud Messaging (FCM)',
+    category: 'Firebase',
+    severity: 'high',
+    impact: 'Unauthorized push notification delivery to any registered device token. Can be used for phishing or spam at scale.',
+    pocMethod: 'POST',
+    pocUrl: 'https://fcm.googleapis.com/fcm/send',
+    pocBody: '{"registration_ids":["ABC"]}',
+    pocNote: 'Authorization: key={KEY}',
+    request: (key, signal) =>
+      doRequest('https://fcm.googleapis.com/fcm/send', {
+        method: 'POST',
+        signal,
+        body: JSON.stringify({ registration_ids: ['ABC'] }),
+        headers: { 'Content-Type': 'application/json', 'Authorization': `key=${key}` },
+      }),
+    parser: parseFcmResponse,
   },
 ];
 
@@ -810,6 +1130,7 @@ function renderReport(results, report) {
     const pocUrl = result.test.pocUrl.replace('{KEY}', maskKey(lastApiKey));
     const pocMethod = result.test.pocMethod || 'GET';
     const pocBody = result.test.pocBody || null;
+    const pocNote = result.test.pocNote ? result.test.pocNote.replace('{KEY}', maskKey(lastApiKey)) : null;
     const isJsonp = result.transport === 'jsonp';
     const isBackend = result.transport === 'backend';
 
@@ -847,6 +1168,9 @@ function renderReport(results, report) {
     const bodySection = pocBody
       ? `<div class="raw-row"><span class="raw-label">BODY</span><code class="raw-val">${escapeHtml(pocBody)}</code></div>`
       : '';
+    const headerSection = pocNote
+      ? `<div class="raw-row"><span class="raw-label">AUTH</span><code class="raw-val">${escapeHtml(pocNote)}</code></div>`
+      : '';
 
     li.innerHTML = `
       <div class="api-head">
@@ -864,6 +1188,7 @@ function renderReport(results, report) {
             <span class="raw-label">REQUEST</span>
             <code class="raw-val">${escapeHtml(pocMethod)} ${escapeHtml(pocUrl)}</code>
           </div>
+          ${headerSection}
           ${bodySection}
           ${rawSection}
         </div>

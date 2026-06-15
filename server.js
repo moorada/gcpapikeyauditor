@@ -19,7 +19,7 @@ const ALLOWED_HOSTS = /^([a-z0-9-]+\.)*googleapis\.com$/i;
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.post('/probe', (req, res) => {
-  const { url, method = 'GET', body = null } = req.body ?? {};
+  const { url, method = 'GET', body = null, headers: extraHeaders = null } = req.body ?? {};
 
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'Missing url' });
@@ -42,7 +42,10 @@ app.post('/probe', (req, res) => {
     hostname: parsed.hostname,
     path: parsed.pathname + parsed.search,
     method: method.toUpperCase(),
-    headers: bodyStr ? { 'Content-Type': 'application/json' } : {},
+    headers: {
+      ...(bodyStr ? { 'Content-Type': 'application/json' } : {}),
+      ...(extraHeaders || {}),
+    },
   };
 
   const upstream = makeRequest(options, (upstream) => {

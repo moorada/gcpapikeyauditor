@@ -36,7 +36,7 @@ async function handleProbe(request) {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400, headers: CORS });
   }
 
-  const { url, method = 'GET', body: reqBody = null } = body;
+  const { url, method = 'GET', body: reqBody = null, headers: reqHeaders = null } = body;
 
   if (!url || typeof url !== 'string') {
     return Response.json({ error: 'Missing url' }, { status: 400, headers: CORS });
@@ -57,10 +57,15 @@ async function handleProbe(request) {
     ? (typeof reqBody === 'string' ? reqBody : JSON.stringify(reqBody))
     : undefined;
 
+  const upstreamHeaders = {
+    ...(bodyStr ? { 'Content-Type': 'application/json' } : {}),
+    ...(reqHeaders || {}),
+  };
+
   try {
     const upstream = await fetch(parsed.toString(), {
       method: method.toUpperCase(),
-      headers: bodyStr ? { 'Content-Type': 'application/json' } : {},
+      headers: upstreamHeaders,
       body: bodyStr,
     });
 
