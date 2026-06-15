@@ -58,7 +58,7 @@ Just open `index.html` in any browser. Maps REST endpoints fall back to JSONP; o
 ```sh
 npm install
 npx wrangler login
-npm run deploy
+npm run deploy:cli
 ```
 
 Wrangler will create the Pages project and print the deployment URL.
@@ -71,8 +71,11 @@ Wrangler will create the Pages project and print the deployment URL.
 
 ### Subsequent deploys
 
+Push to `main` — Cloudflare Pages auto-deploys on every push. No build command needed; leave both **Build command** and **Deploy command** empty in the dashboard.
+
+To deploy manually from the CLI instead:
 ```sh
-npm run deploy
+npm run deploy:cli
 ```
 
 ---
