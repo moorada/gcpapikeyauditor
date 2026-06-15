@@ -16,21 +16,7 @@
     <main class="app">
       <section class="hero" aria-labelledby="title">
         <h1 id="title">GCP API Key Auditor</h1>
-        <p class="subtitle">All probes run locally in your browser — your API key is never sent to any third party.</p>
-
-        <div class="mode-row">
-          <div class="mode-segmented" id="mode-segmented" role="group" aria-label="Test mode">
-            <button class="mode-opt" data-mode="client" type="button">Client-side</button>
-            <button class="mode-opt" data-mode="backend" type="button">Backend</button>
-          </div>
-          <div class="info-wrap">
-            <span class="info-icon" aria-label="About test modes">ⓘ</span>
-            <div class="info-tooltip" role="tooltip">
-              <p><strong>Client-side</strong> — runs entirely in your browser. No setup needed. Maps REST APIs fall back to JSONP; other CORS-blocked endpoints show as Unknown.</p>
-              <p><strong>Backend</strong> — routes requests through the Cloudflare Worker proxy. Full endpoint coverage, no CORS limits. Requires the Worker to be deployed or running locally.</p>
-            </div>
-          </div>
-        </div>
+        <p class="subtitle">Probes are routed through a Cloudflare Worker — your API key is never stored or forwarded to any third party.</p>
 
         <form id="audit-form" class="audit-form" autocomplete="off">
           <label for="api-key" class="visually-hidden">Google Cloud API key</label>

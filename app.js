@@ -6,87 +6,17 @@ const resultsNode = document.getElementById('results');
 const summaryNode = document.getElementById('summary');
 const apiResultsNode = document.getElementById('api-results');
 const issuesNode = document.getElementById('issues');
-const backendStatusNode = document.getElementById('backend-status');
 
-// ── Backend detection & mode override ─────────────────
-// Tries /api (Cloudflare Pages Functions or wrangler dev) then Node.js local backend.
-const BACKEND_CANDIDATES = ['/api', 'http://127.0.0.1:3001'];
-let backendAvailable = false;
-let activeBackendUrl = null;
-let modeOverride = null; // 'client' | 'backend' | null (follows detection)
 let discoveredProjectId = null;
 let lastApiKey = null;
-
-function shouldUseBackend() {
-  const mode = modeOverride ?? (backendAvailable ? 'backend' : 'client');
-  return mode === 'backend' && backendAvailable;
-}
-
-async function detectBackend() {
-  for (const candidate of BACKEND_CANDIDATES) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 1500);
-      const res = await fetch(`${candidate}/health`, { signal: controller.signal });
-      clearTimeout(timer);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok) {
-          backendAvailable = true;
-          activeBackendUrl = candidate;
-          break;
-        }
-      }
-    } catch {}
-  }
-  renderBackendStatus();
-}
-
-function renderBackendStatus() {
-  syncModeToggle();
-}
-
-function syncModeToggle() {
-  const effective = modeOverride ?? (backendAvailable ? 'backend' : 'client');
-  document.querySelectorAll('.mode-opt').forEach((btn) => {
-    const isActive = btn.dataset.mode === effective;
-    btn.classList.toggle('active', isActive);
-    // Dim backend button if no backend available
-    if (btn.dataset.mode === 'backend') {
-      btn.classList.toggle('mode-opt-unavailable', !backendAvailable);
-      btn.title = backendAvailable ? '' : 'No backend detected — deploy to Cloudflare or run locally';
-    }
-  });
-}
-
-document.getElementById('mode-segmented')?.addEventListener('click', (e) => {
-  const btn = e.target.closest('.mode-opt');
-  if (!btn) return;
-  modeOverride = btn.dataset.mode;
-  syncModeToggle();
-});
-
-detectBackend();
 
 // ── Request helpers ────────────────────────────────────
 
 async function doRequest(url, options) {
-  return shouldUseBackend() ? doBackendRequest(url, options) : doDirectRequest(url, options);
-}
-
-async function doDirectRequest(url, options) {
-  const response = await fetch(url, options);
-  const text = await response.text();
-  let json = null;
-  try { json = text ? JSON.parse(text) : null; } catch {}
-  return { ok: response.ok, statusCode: response.status, body: json, text };
-}
-
-async function doBackendRequest(url, options) {
   const extraHeaders = options?.headers ? Object.fromEntries(
     Object.entries(options.headers).filter(([k]) => k.toLowerCase() !== 'content-type')
   ) : null;
-  const res = await fetch(`${activeBackendUrl}/probe`, {
+  const res = await fetch('/api/probe', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -106,53 +36,6 @@ async function doBackendRequest(url, options) {
     body: json,
     text: data.text || '',
   };
-}
-
-// JSONP — client-side fallback for Maps REST APIs that block CORS.
-// Maps Directions, Distance Matrix, Places support ?callback= for JSONP.
-// Note: JSONP can't read the HTTP status code (always reports 200).
-function doJsonpRequest(url, signal) {
-  return new Promise((resolve, reject) => {
-    const cbName = `__gcpauditor_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const script = document.createElement('script');
-    let settled = false;
-
-    const cleanup = () => {
-      delete window[cbName];
-      script.remove();
-    };
-
-    signal?.addEventListener('abort', () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(new DOMException('Aborted', 'AbortError'));
-    });
-
-    window[cbName] = (data) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      const text = JSON.stringify(data);
-      resolve({ ok: true, statusCode: 200, body: data, text });
-    };
-
-    script.onerror = () => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(new Error('JSONP request failed'));
-    };
-
-    script.src = `${url}&callback=${cbName}`;
-    document.head.appendChild(script);
-  });
-}
-
-// Helper: use backend if available, fall back to JSONP for Maps REST GET endpoints.
-function doMapsRequest(url, signal) {
-  if (shouldUseBackend()) return doRequest(url, { method: 'GET', signal });
-  return doJsonpRequest(url, signal);
 }
 
 // ── API test definitions ───────────────────────────────
@@ -222,9 +105,8 @@ const API_TESTS = [
     pocMethod: 'GET',
     pocUrl: 'https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=milan&inputtype=textquery&fields=place_id&key={KEY}',
     pocBody: null,
-    clientNote: 'JSONP',
     request: (key, signal) =>
-      doMapsRequest(
+      doRequest(
         `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=milan&inputtype=textquery&fields=place_id&key=${encodeURIComponent(key)}`,
         signal
       ),
@@ -239,9 +121,8 @@ const API_TESTS = [
     pocMethod: 'GET',
     pocUrl: 'https://maps.googleapis.com/maps/api/directions/json?origin=rome&destination=milan&key={KEY}',
     pocBody: null,
-    clientNote: 'JSONP',
     request: (key, signal) =>
-      doMapsRequest(
+      doRequest(
         `https://maps.googleapis.com/maps/api/directions/json?origin=rome&destination=milan&key=${encodeURIComponent(key)}`,
         signal
       ),
@@ -256,9 +137,8 @@ const API_TESTS = [
     pocMethod: 'GET',
     pocUrl: 'https://maps.googleapis.com/maps/api/distancematrix/json?origins=rome&destinations=milan&key={KEY}',
     pocBody: null,
-    clientNote: 'JSONP',
     request: (key, signal) =>
-      doMapsRequest(
+      doRequest(
         `https://maps.googleapis.com/maps/api/distancematrix/json?origins=rome&destinations=milan&key=${encodeURIComponent(key)}`,
         signal
       ),
@@ -301,9 +181,8 @@ const API_TESTS = [
     pocMethod: 'GET',
     pocUrl: 'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Bingh&types=(cities)&key={KEY}',
     pocBody: null,
-    clientNote: 'JSONP',
     request: (key, signal) =>
-      doMapsRequest(`https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Bingh&types=%28cities%29&key=${encodeURIComponent(key)}`, signal),
+      doRequest(`https://maps.googleapis.com/maps/api/place/autocomplete/json?input=Bingh&types=%28cities%29&key=${encodeURIComponent(key)}`, signal),
     parser: parseMapsStyleResponse,
   },
   {
@@ -315,9 +194,8 @@ const API_TESTS = [
     pocMethod: 'GET',
     pocUrl: 'https://maps.googleapis.com/maps/api/place/details/json?place_id=ChIJN1t_tDeuEmsRUsoyG83frY4&fields=name,rating,formatted_phone_number&key={KEY}',
     pocBody: null,
-    clientNote: 'JSONP',
     request: (key, signal) =>
-      doMapsRequest(`https://maps.googleapis.com/maps/api/place/details/json?place_id=ChIJN1t_tDeuEmsRUsoyG83frY4&fields=name,rating,formatted_phone_number&key=${encodeURIComponent(key)}`, signal),
+      doRequest(`https://maps.googleapis.com/maps/api/place/details/json?place_id=ChIJN1t_tDeuEmsRUsoyG83frY4&fields=name,rating,formatted_phone_number&key=${encodeURIComponent(key)}`, signal),
     parser: parseMapsStyleResponse,
   },
   {
@@ -329,9 +207,8 @@ const API_TESTS = [
     pocMethod: 'GET',
     pocUrl: 'https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=-33.8670522,151.1957362&radius=100&types=food&key={KEY}',
     pocBody: null,
-    clientNote: 'JSONP',
     request: (key, signal) =>
-      doMapsRequest(`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=-33.8670522,151.1957362&radius=100&types=food&name=harbour&key=${encodeURIComponent(key)}`, signal),
+      doRequest(`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=-33.8670522,151.1957362&radius=100&types=food&name=harbour&key=${encodeURIComponent(key)}`, signal),
     parser: parseMapsStyleResponse,
   },
   {
@@ -343,9 +220,8 @@ const API_TESTS = [
     pocMethod: 'GET',
     pocUrl: 'https://maps.googleapis.com/maps/api/place/textsearch/json?query=restaurants+in+Sydney&key={KEY}',
     pocBody: null,
-    clientNote: 'JSONP',
     request: (key, signal) =>
-      doMapsRequest(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=restaurants+in+Sydney&key=${encodeURIComponent(key)}`, signal),
+      doRequest(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=restaurants+in+Sydney&key=${encodeURIComponent(key)}`, signal),
     parser: parseMapsStyleResponse,
   },
   {
@@ -371,9 +247,8 @@ const API_TESTS = [
     pocMethod: 'GET',
     pocUrl: 'https://maps.googleapis.com/maps/api/elevation/json?locations=39.7391536,-104.9847034&key={KEY}',
     pocBody: null,
-    clientNote: 'JSONP',
     request: (key, signal) =>
-      doMapsRequest(`https://maps.googleapis.com/maps/api/elevation/json?locations=39.7391536,-104.9847034&key=${encodeURIComponent(key)}`, signal),
+      doRequest(`https://maps.googleapis.com/maps/api/elevation/json?locations=39.7391536,-104.9847034&key=${encodeURIComponent(key)}`, signal),
     parser: parseMapsStyleResponse,
   },
   {
@@ -385,9 +260,8 @@ const API_TESTS = [
     pocMethod: 'GET',
     pocUrl: 'https://maps.googleapis.com/maps/api/timezone/json?location=39.6034810,-119.6822510&timestamp=1331161200&key={KEY}',
     pocBody: null,
-    clientNote: 'JSONP',
     request: (key, signal) =>
-      doMapsRequest(`https://maps.googleapis.com/maps/api/timezone/json?location=39.6034810,-119.6822510&timestamp=1331161200&key=${encodeURIComponent(key)}`, signal),
+      doRequest(`https://maps.googleapis.com/maps/api/timezone/json?location=39.6034810,-119.6822510&timestamp=1331161200&key=${encodeURIComponent(key)}`, signal),
     parser: parseTimezoneResponse,
   },
   // ── Roads ─────────────────────────────────────────────
@@ -903,7 +777,6 @@ async function runTest(test, apiKey) {
   const timeout = setTimeout(() => controller.abort(), 12000);
 
   try {
-    const usedBackend = shouldUseBackend();
     const raw = await test.request(apiKey, controller.signal);
 
     if (!discoveredProjectId && raw.text) {
@@ -912,8 +785,7 @@ async function runTest(test, apiKey) {
     }
 
     const parsed = test.parser ? test.parser(raw) : parseGoogleStyleResponse(raw);
-    const transport = usedBackend ? 'backend' : (test.clientNote === 'JSONP' ? 'jsonp' : 'direct');
-    return { test, ...parsed, raw, transport };
+    return { test, ...parsed, raw };
   } catch (error) {
     if (error.name === 'AbortError') {
       return { test, status: 'unknown', severity: 'low', summary: 'Request timeout', details: 'The endpoint did not respond before the timeout.', raw: null };
@@ -1143,14 +1015,6 @@ function renderReport(results, report) {
     const pocMethod = result.test.pocMethod || 'GET';
     const pocBody = result.test.pocBody || null;
     const pocNote = result.test.pocNote ? result.test.pocNote.replace('{KEY}', maskKey(lastApiKey)) : null;
-    const isJsonp = result.transport === 'jsonp';
-    const isBackend = result.transport === 'backend';
-
-    const transportBadge = isBackend
-      ? '<span class="transport-badge tb-backend">via backend</span>'
-      : isJsonp
-        ? '<span class="transport-badge tb-jsonp">via JSONP</span>'
-        : '';
 
     let rawSection = '';
     if (result.raw) {
@@ -1161,7 +1025,7 @@ function renderReport(results, report) {
       rawSection = `
         <div class="raw-row">
           <span class="raw-label">RESPONSE</span>
-          <span class="raw-val">${escapeHtml(String(result.raw.statusCode))}${isJsonp ? ' <em class="raw-note">(JSONP — status always 200)</em>' : ''}</span>
+          <span class="raw-val">${escapeHtml(String(result.raw.statusCode))}</span>
         </div>
         <div class="raw-row raw-row-pre">
           <span class="raw-label">DATA</span>
@@ -1169,15 +1033,11 @@ function renderReport(results, report) {
         </div>
       `;
     } else {
-      const backendHint = result.transport !== 'backend'
-        ? '<span class="cors-hint">Switch to <strong>Backend</strong> mode for full coverage on this endpoint.</span>'
-        : '';
       rawSection = `
         <div class="raw-row">
           <span class="raw-label">RESPONSE</span>
-          <span class="raw-val raw-blocked">Could not connect — CORS or network error${backendHint ? ' &nbsp;' : ''}</span>
+          <span class="raw-val raw-blocked">Could not connect — network error</span>
         </div>
-        ${backendHint ? `<div class="raw-row"><span class="raw-label"></span>${backendHint}</div>` : ''}
       `;
     }
 
@@ -1198,7 +1058,7 @@ function renderReport(results, report) {
       <div class="api-impact">${escapeHtml(result.test.impact)}</div>
       <div class="api-finding">${escapeHtml(result.summary)}${result.details ? ` — ${escapeHtml(result.details)}` : ''}</div>
       <details class="api-raw">
-        <summary><span class="raw-arrow">▶</span> Details &amp; PoC ${transportBadge}</summary>
+        <summary><span class="raw-arrow">▶</span> Details &amp; PoC</summary>
         <div class="raw-panel">
           <div class="raw-row">
             <span class="raw-label">REQUEST</span>
@@ -1228,44 +1088,7 @@ function renderReport(results, report) {
     issuesNode.appendChild(li);
   }
 
-  // Backend help section (only in client-only mode)
-  renderBackendHelp();
-
   resultsNode.classList.remove('hidden');
-}
-
-function renderBackendHelp() {
-  const existing = document.getElementById('backend-help');
-  if (existing) existing.remove();
-  if (shouldUseBackend()) return;
-
-  const div = document.createElement('div');
-  div.id = 'backend-help';
-  div.className = 'backend-help';
-  div.innerHTML = `
-    <h2>Run with backend for full coverage</h2>
-    <p>Some probes are blocked by browser CORS policy. A backend proxy removes this constraint — your API key never leaves your environment.</p>
-    <h3 class="help-heading">Option A — Cloudflare Pages (recommended)</h3>
-    <div class="help-steps">
-      <div class="help-step"><span class="step-num">1</span><code>npm install</code></div>
-      <div class="help-step"><span class="step-num">2</span><code>npm run deploy</code></div>
-      <div class="help-step"><span class="step-num">3</span>Open the deployed Cloudflare Pages URL — Worker activates automatically</div>
-    </div>
-    <h3 class="help-heading">Option B — Local dev with Wrangler</h3>
-    <div class="help-steps">
-      <div class="help-step"><span class="step-num">1</span><code>npm install</code></div>
-      <div class="help-step"><span class="step-num">2</span><code>npm run dev</code></div>
-      <div class="help-step"><span class="step-num">3</span>Open <code>localhost:8787</code> in this browser — backend activates automatically</div>
-    </div>
-    <h3 class="help-heading">Option C — Local Node.js</h3>
-    <div class="help-steps">
-      <div class="help-step"><span class="step-num">1</span><code>npm install</code></div>
-      <div class="help-step"><span class="step-num">2</span><code>npm start</code></div>
-      <div class="help-step"><span class="step-num">3</span>Reload this page — backend activates automatically</div>
-    </div>
-    <p class="note">The proxy only accepts requests to <code>*.googleapis.com</code>. Your API key is never sent to any third-party service.</p>
-  `;
-  resultsNode.appendChild(div);
 }
 
 function hideResults() {
@@ -1273,8 +1096,6 @@ function hideResults() {
   summaryNode.innerHTML = '';
   apiResultsNode.innerHTML = '';
   issuesNode.innerHTML = '';
-  const help = document.getElementById('backend-help');
-  if (help) help.remove();
 }
 
 function labelForStatus(status) {
