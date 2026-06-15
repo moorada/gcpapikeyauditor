@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GCP API Key Auditor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="hero" aria-labelledby="title">
+        <p class="eyebrow">Client-Side Surface Audit</p>
+        <h1 id="title">GCP API Key Auditor</h1>
+        <p class="subtitle">Paste a key, run the probe set, and inspect effective risk exposure.</p>
+
+        <div id="backend-status" class="backend-status" aria-live="polite"></div>
+
+        <form id="audit-form" class="audit-form" autocomplete="off">
+          <label for="api-key" class="visually-hidden">Google Cloud API key</label>
+          <input
+            id="api-key"
+            name="api-key"
+            type="password"
+            placeholder="Paste GCP API key (AIza...)"
+            spellcheck="false"
+            required
+          />
+          <button id="analyze-btn" type="submit">Run Audit</button>
+        </form>
+
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section id="results" class="results hidden" aria-live="polite">
+        <div class="summary" id="summary"></div>
+        <div class="result-section">
+          <h2>API Probe Results</h2>
+          <ul id="api-results" class="api-list"></ul>
+        </div>
+        <div class="result-section">
+          <h2>Issues &amp; Impacts</h2>
+          <ul id="issues" class="issues-list"></ul>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "gcp-api-key-auditor",
+  "version": "1.0.0",
+  "description": "GCP API key auditor — Cloudflare Pages + Functions",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev .",
+    "deploy": "wrangler pages deploy .",
+    "start": "node server.js"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
