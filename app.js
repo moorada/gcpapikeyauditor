@@ -161,7 +161,11 @@ function doMapsRequest(url, signal) {
 
 function parseImageResponse(raw) {
   if (raw.ok) {
-    return { status: 'accessible', severity: 'high', summary: 'Endpoint reachable — content served successfully', details: `HTTP ${raw.statusCode}` };
+    return { status: 'accessible', severity: 'high', summary: 'Endpoint reachable — image content served', details: `HTTP ${raw.statusCode}` };
+  }
+  // Image APIs return binary (PNG) error responses — cannot parse reason from body
+  if (!raw.body) {
+    return { status: 'not_enabled', severity: 'low', summary: 'Access denied — API key restricted or service not enabled', details: `HTTP ${raw.statusCode}` };
   }
   return parseGoogleStyleResponse(raw);
 }
@@ -184,6 +188,9 @@ function parseFcmResponse(raw) {
   }
   if (raw.statusCode === 401) {
     return { status: 'not_enabled', severity: 'low', summary: 'FCM key not authorized', details: 'Key rejected by FCM — Firebase Cloud Messaging may not be enabled for this project' };
+  }
+  if (raw.statusCode === 404) {
+    return { status: 'not_enabled', severity: 'low', summary: 'FCM legacy endpoint unavailable', details: 'The legacy FCM HTTP API (/fcm/send) was deprecated in 2024 and is no longer reachable. The v1 API requires OAuth — not testable with an API key.' };
   }
   return parseGoogleStyleResponse(raw);
 }
@@ -945,7 +952,9 @@ function parseGoogleStyleResponse(raw) {
     return { status: 'unknown', severity: 'low', summary: 'Non-JSON response could not be interpreted', details: `HTTP ${raw.statusCode}` };
   }
 
-  const error = raw.body.error;
+  // Routes Matrix returns an array of results; unwrap to read the error
+  const bodyObj = Array.isArray(raw.body) ? raw.body[0] : raw.body;
+  const error = bodyObj?.error;
   if (!error) {
     return { status: 'accessible', severity: 'medium', summary: 'Endpoint reachable with this key', details: `HTTP ${raw.statusCode}` };
   }
