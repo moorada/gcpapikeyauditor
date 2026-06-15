@@ -625,6 +625,11 @@ function collectReasons(error) {
 function classifyFromMessage(message, statusCode, reasons = []) {
   const text = `${message} ${reasons.join(' ')}`.toLowerCase();
 
+  // 401 = OAuth required; API keys cannot authenticate to this endpoint regardless of restrictions
+  if (statusCode === 401) {
+    return { status: 'not_enabled', severity: 'low', summary: 'Requires OAuth — not testable with an API key alone', details: safeText(message) };
+  }
+
   if (text.includes('api key not valid') || text.includes('api_key_invalid') || text.includes('badrequest')) {
     return { status: 'invalid', severity: 'high', summary: 'API key appears invalid', details: safeText(message) };
   }
@@ -635,11 +640,13 @@ function classifyFromMessage(message, statusCode, reasons = []) {
     text.includes('requests from referer') || text.includes('requests from referrer') ||
     text.includes('referer') || text.includes('referrer')
   ) {
-    return { status: 'restricted', severity: 'low', summary: 'Blocked by API key restrictions', details: safeText(message) };
+    return { status: 'restricted', severity: 'low', summary: 'Blocked by API key origin restriction', details: safeText(message) };
   }
 
+  // API_KEY_SERVICE_BLOCKED = the key has an API allowlist configured; this API is not on it.
+  // This is a key-level restriction (good security posture), not a project-level service state.
   if (text.includes('api_key_service_blocked') || text.includes('are blocked')) {
-    return { status: 'not_enabled', severity: 'low', summary: 'API service blocked for this key', details: safeText(message) };
+    return { status: 'restricted', reason: 'service_block', severity: 'low', summary: 'API blocked by key restriction', details: safeText(message) };
   }
 
   if (
@@ -647,7 +654,7 @@ function classifyFromMessage(message, statusCode, reasons = []) {
     text.includes('not enabled') || text.includes('not activated') ||
     text.includes('not authorized to use this api')
   ) {
-    return { status: 'not_enabled', severity: 'low', summary: 'API is not enabled in the target project', details: safeText(message) };
+    return { status: 'not_enabled', severity: 'low', summary: 'API not enabled in the target project', details: safeText(message) };
   }
 
   if (text.includes('billing')) {
@@ -679,6 +686,10 @@ function buildReport(results) {
   const unknown = count('unknown');
   const invalid = count('invalid');
 
+  // Breakdown of restricted: key-level API service blocks vs origin/referrer restrictions
+  const keyServiceBlocked = results.filter((r) => r.status === 'restricted' && r.reason === 'service_block').length;
+  const originRestricted = restricted - keyServiceBlocked;
+
   const issues = [];
 
   if (invalid > 0) {
@@ -697,8 +708,8 @@ function buildReport(results) {
     issues.push({ level: 'medium', title: 'Billing or quota-linked endpoints detected', detail: 'Abuse can translate into direct spend and service degradation from quota exhaustion.' });
   }
 
-  if (restricted === 0 && accessible > 0) {
-    issues.push({ level: 'high', title: 'No strong restriction enforcement signal observed', detail: 'If this result is confirmed from multiple origins, the key may be overly permissive and should be tightened.' });
+  if (originRestricted === 0 && accessible > 0) {
+    issues.push({ level: 'high', title: 'No origin restriction enforcement signal observed', detail: 'No referrer, IP, or app restriction was detected. If confirmed from multiple origins, the key is not restricted by caller and should be tightened.' });
   }
 
   if (discoveredProjectId) {
@@ -709,8 +720,12 @@ function buildReport(results) {
     issues.push({ level: 'info', title: 'Some probes were inconclusive', detail: `${unknown} probe${unknown === 1 ? '' : 's'} could not be completed due to CORS or network restrictions. Run with backend for full coverage.` });
   }
 
+  if (keyServiceBlocked > 0) {
+    issues.push({ level: 'info', title: `${keyServiceBlocked} ${keyServiceBlocked === 1 ? 'API is' : 'APIs are'} blocked by key restriction`, detail: 'The key has an API allowlist configured — these services are explicitly excluded. This is the correct security posture for a restricted key.' });
+  }
+
   if (notEnabled > 0) {
-    issues.push({ level: 'info', title: `${notEnabled} ${notEnabled === 1 ? 'API is' : 'APIs are'} not enabled or blocked`, detail: 'This reduces the exposed surface but does not replace strict key restrictions.' });
+    issues.push({ level: 'info', title: `${notEnabled} ${notEnabled === 1 ? 'API is' : 'APIs are'} not enabled in the target project`, detail: 'These services have not been activated in the GCP project. This reduces the exposed surface but is independent of key restrictions.' });
   }
 
   return {
