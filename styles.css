@@ -192,13 +192,19 @@ button:disabled {
 
 .pid-alert {
   display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.75rem 0;
+  padding: 0.6rem 0.85rem;
+  border-left: 2px solid var(--warn);
+  background: rgba(242, 181, 114, 0.05);
+}
+
+.pid-main-row {
+  display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 0.5rem 0.8rem;
-  margin: 0.75rem 0;
-  padding: 0.55rem 0.85rem;
-  border-left: 2px solid var(--warn);
-  background: rgba(242, 181, 114, 0.05);
 }
 
 .pid-label {
@@ -220,6 +226,30 @@ button:disabled {
 .pid-desc {
   font-size: 0.81rem;
   color: var(--muted);
+}
+
+.pid-poc-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-top: 0.15rem;
+}
+
+.pid-poc-label {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  flex-shrink: 0;
+}
+
+.pid-poc-url {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.76rem;
+  color: var(--muted);
+  word-break: break-all;
+  line-height: 1.5;
 }
 
 /* ── RESULT SECTIONS ───────────────────────────────── */

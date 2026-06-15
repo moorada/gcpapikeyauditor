@@ -8,6 +8,7 @@ const apiResultsNode = document.getElementById('api-results');
 const issuesNode = document.getElementById('issues');
 
 let discoveredProjectId = null;
+let discoveredProjectSource = null;
 let lastApiKey = null;
 
 // ── Request helpers ────────────────────────────────────
@@ -731,6 +732,7 @@ form.addEventListener('submit', async (event) => {
 
   button.disabled = true;
   discoveredProjectId = null;
+  discoveredProjectSource = null;
   lastApiKey = apiKey;
   hideResults();
   paintStatus('Starting exposure analysis...', 'info');
@@ -781,7 +783,10 @@ async function runTest(test, apiKey) {
 
     if (!discoveredProjectId && raw.text) {
       const found = extractProjectId(raw.text);
-      if (found) discoveredProjectId = found;
+      if (found) {
+        discoveredProjectId = found;
+        discoveredProjectSource = test.pocUrl ? test.pocUrl.replace('{KEY}', maskKey(lastApiKey)) : test.name;
+      }
     }
 
     const parsed = test.parser ? test.parser(raw) : parseGoogleStyleResponse(raw);
@@ -990,11 +995,17 @@ function renderReport(results, report) {
   ];
 
   if (discoveredProjectId) {
+    const pocLine = discoveredProjectSource
+      ? `<div class="pid-poc-row"><span class="pid-poc-label">PoC</span><code class="pid-poc-url">${escapeHtml(discoveredProjectSource)}</code></div>`
+      : '';
     parts.push(`
       <div class="pid-alert">
-        <span class="pid-label">PROJECT ID DISCLOSED</span>
-        <code class="pid-value">${escapeHtml(discoveredProjectId)}</code>
-        <span class="pid-desc">Leaked via error responses — project-scoped probes were automatically added.</span>
+        <div class="pid-main-row">
+          <span class="pid-label">PROJECT ID DISCLOSED</span>
+          <code class="pid-value">${escapeHtml(discoveredProjectId)}</code>
+        </div>
+        <span class="pid-desc">Leaked via API error response — project-scoped probes were automatically added.</span>
+        ${pocLine}
       </div>
     `);
   }
