@@ -4,8 +4,8 @@
   "description": "GCP API key auditor — Cloudflare Pages + Functions",
   "type": "module",
   "scripts": {
-    "dev": "wrangler pages dev .",
-    "deploy:cli": "wrangler pages deploy .",
+    "dev": "wrangler dev",
+    "deploy:cli": "wrangler deploy",
     "start": "node server.js"
   },
   "devDependencies": {

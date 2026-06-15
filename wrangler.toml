@@ -1,3 +1,6 @@
-name = "gcp-api-key-auditor"
-pages_build_output_dir = "."
+name = "gcpapikeyauditor"
+main = "worker.js"
 compatibility_date = "2024-09-23"
+
+[assets]
+directory = "."

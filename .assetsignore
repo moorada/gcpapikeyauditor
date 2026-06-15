@@ -1,0 +1,13 @@
+node_modules/
+worker.js
+server.js
+package.json
+package-lock.json
+bun.lockb
+wrangler.toml
+README.md
+.gitignore
+.assetsignore
+functions/
+.agents/
+.codex/
