@@ -266,6 +266,7 @@ const API_TESTS = [
     pocMethod: 'GET',
     pocUrl: 'https://maps.googleapis.com/maps/api/staticmap?center=45,10&zoom=7&size=400x400&key={KEY}',
     pocBody: null,
+    binaryResponse: true,
     request: (key, signal) =>
       doRequest(`https://maps.googleapis.com/maps/api/staticmap?center=45,10&zoom=7&size=400x400&key=${encodeURIComponent(key)}`, { method: 'GET', signal }),
     parser: parseImageResponse,
@@ -279,6 +280,7 @@ const API_TESTS = [
     pocMethod: 'GET',
     pocUrl: 'https://maps.googleapis.com/maps/api/streetview?size=400x400&location=40.720032,-73.988354&key={KEY}',
     pocBody: null,
+    binaryResponse: true,
     request: (key, signal) =>
       doRequest(`https://maps.googleapis.com/maps/api/streetview?size=400x400&location=40.720032,-73.988354&fov=90&heading=235&pitch=10&key=${encodeURIComponent(key)}`, { method: 'GET', signal }),
     parser: parseImageResponse,
@@ -348,6 +350,7 @@ const API_TESTS = [
     pocMethod: 'GET',
     pocUrl: 'https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=CnRtAAAATLZNl354RwP_9UKbQ_5Psy40texXePv4oAlgP4qNEkdIrkyse7rPXYGd9D_Uj1rVsQdWT4oRz4QrYAJNpFX7rzqqMlZw2h2E2y5IKMUZ7ouD_SlcHxYq1yL4KbKUv3qtWgTK0A6QbGh87GB3sscrHRIQiG2RrmU_jF4tENr9wGS_YxoUSSDrYjWmrNfeEHSGSc3FyhNLlBU&key={KEY}',
     pocBody: null,
+    binaryResponse: true,
     request: (key, signal) =>
       doRequest(`https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=CnRtAAAATLZNl354RwP_9UKbQ_5Psy40texXePv4oAlgP4qNEkdIrkyse7rPXYGd9D_Uj1rVsQdWT4oRz4QrYAJNpFX7rzqqMlZw2h2E2y5IKMUZ7ouD_SlcHxYq1yL4KbKUv3qtWgTK0A6QbGh87GB3sscrHRIQiG2RrmU_jF4tENr9wGS_YxoUSSDrYjWmrNfeEHSGSc3FyhNLlBU&key=${encodeURIComponent(key)}`, { method: 'GET', signal }),
     parser: parseImageResponse,
@@ -1142,6 +1145,10 @@ function renderReport(results, report) {
 
     let rawSection = '';
     if (result.raw) {
+      const isBinary = result.test.binaryResponse && result.raw.ok;
+      const dataContent = isBinary
+        ? '<em class="raw-note">Binary image content — access confirmed by HTTP status above</em>'
+        : `<pre class="raw-pre">${highlightBody(result.raw.text, lastApiKey)}</pre>`;
       rawSection = `
         <div class="raw-row">
           <span class="raw-label">RESPONSE</span>
@@ -1149,7 +1156,7 @@ function renderReport(results, report) {
         </div>
         <div class="raw-row raw-row-pre">
           <span class="raw-label">DATA</span>
-          <pre class="raw-pre">${highlightBody(result.raw.text, lastApiKey)}</pre>
+          ${dataContent}
         </div>
       `;
     } else {
