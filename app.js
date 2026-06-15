@@ -8,13 +8,19 @@ const apiResultsNode = document.getElementById('api-results');
 const issuesNode = document.getElementById('issues');
 const backendStatusNode = document.getElementById('backend-status');
 
-// ── Backend detection ──────────────────────────────────
+// ── Backend detection & mode override ─────────────────
 // Tries /api (Cloudflare Pages Functions or wrangler dev) then Node.js local backend.
 const BACKEND_CANDIDATES = ['/api', 'http://127.0.0.1:3001'];
 let backendAvailable = false;
 let activeBackendUrl = null;
+let modeOverride = null; // 'client' | 'backend' | null (follows detection)
 let discoveredProjectId = null;
 let lastApiKey = null;
+
+function shouldUseBackend() {
+  const mode = modeOverride ?? (backendAvailable ? 'backend' : 'client');
+  return mode === 'backend' && backendAvailable;
+}
 
 async function detectBackend() {
   for (const candidate of BACKEND_CANDIDATES) {
@@ -41,24 +47,45 @@ function renderBackendStatus() {
   if (backendAvailable) {
     const isCloudflare = activeBackendUrl === '/api';
     const label = isCloudflare
-      ? 'Cloudflare Worker connected — full probe coverage'
-      : 'Local Node.js backend connected — full probe coverage';
+      ? 'Cloudflare Worker connected'
+      : 'Local Node.js backend connected';
     backendStatusNode.className = 'backend-status bs-on';
     backendStatusNode.innerHTML = `<span class="bs-dot"></span>${label}`;
   } else {
     backendStatusNode.className = 'backend-status bs-off';
     backendStatusNode.innerHTML =
-      '<span class="bs-dot"></span>Client-only mode — Maps REST endpoints probed via JSONP'
-      + ' <a class="bs-link" href="#backend-help">How to enable backend</a>';
+      '<span class="bs-dot"></span>No backend detected'
+      + ' <a class="bs-link" href="#backend-help">How to enable</a>';
   }
+  syncModeToggle();
 }
+
+function syncModeToggle() {
+  const effective = modeOverride ?? (backendAvailable ? 'backend' : 'client');
+  document.querySelectorAll('.mode-opt').forEach((btn) => {
+    const isActive = btn.dataset.mode === effective;
+    btn.classList.toggle('active', isActive);
+    // Dim backend button if no backend available
+    if (btn.dataset.mode === 'backend') {
+      btn.classList.toggle('mode-opt-unavailable', !backendAvailable);
+      btn.title = backendAvailable ? '' : 'No backend detected — deploy to Cloudflare or run locally';
+    }
+  });
+}
+
+document.getElementById('mode-segmented')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mode-opt');
+  if (!btn) return;
+  modeOverride = btn.dataset.mode;
+  syncModeToggle();
+});
 
 detectBackend();
 
 // ── Request helpers ────────────────────────────────────
 
 async function doRequest(url, options) {
-  return backendAvailable ? doBackendRequest(url, options) : doDirectRequest(url, options);
+  return shouldUseBackend() ? doBackendRequest(url, options) : doDirectRequest(url, options);
 }
 
 async function doDirectRequest(url, options) {
@@ -134,7 +161,7 @@ function doJsonpRequest(url, signal) {
 
 // Helper: use backend if available, fall back to JSONP for Maps REST GET endpoints.
 function doMapsRequest(url, signal) {
-  if (backendAvailable) return doRequest(url, { method: 'GET', signal });
+  if (shouldUseBackend()) return doRequest(url, { method: 'GET', signal });
   return doJsonpRequest(url, signal);
 }
 
@@ -560,6 +587,7 @@ async function runTest(test, apiKey) {
   const timeout = setTimeout(() => controller.abort(), 12000);
 
   try {
+    const usedBackend = shouldUseBackend();
     const raw = await test.request(apiKey, controller.signal);
 
     if (!discoveredProjectId && raw.text) {
@@ -568,7 +596,8 @@ async function runTest(test, apiKey) {
     }
 
     const parsed = test.parser ? test.parser(raw) : parseGoogleStyleResponse(raw);
-    return { test, ...parsed, raw };
+    const transport = usedBackend ? 'backend' : (test.clientNote === 'JSONP' ? 'jsonp' : 'direct');
+    return { test, ...parsed, raw, transport };
   } catch (error) {
     if (error.name === 'AbortError') {
       return { test, status: 'unknown', severity: 'low', summary: 'Request timeout', details: 'The endpoint did not respond before the timeout.', raw: null };
@@ -791,8 +820,8 @@ function renderReport(results, report) {
     const pocUrl = result.test.pocUrl.replace('{KEY}', maskKey(lastApiKey));
     const pocMethod = result.test.pocMethod || 'GET';
     const pocBody = result.test.pocBody || null;
-    const isJsonp = !backendAvailable && result.test.clientNote === 'JSONP';
-    const isBackend = backendAvailable;
+    const isJsonp = result.transport === 'jsonp';
+    const isBackend = result.transport === 'backend';
 
     const transportBadge = isBackend
       ? '<span class="transport-badge tb-backend">via backend</span>'
@@ -873,7 +902,7 @@ function renderReport(results, report) {
 function renderBackendHelp() {
   const existing = document.getElementById('backend-help');
   if (existing) existing.remove();
-  if (backendAvailable) return;
+  if (shouldUseBackend()) return;
 
   const div = document.createElement('div');
   div.id = 'backend-help';

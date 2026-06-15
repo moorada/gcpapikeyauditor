@@ -1,5 +1,9 @@
 # GCP API Key Auditor
 
+**[→ Try it live at gcpapikeyauditor.alongale.com](https://gcpapikeyauditor.alongale.com/)**
+
+---
+
 Browser-based tool to audit a Google Cloud API key and estimate its exposure surface:
 
 - Which APIs are reachable from a browser context

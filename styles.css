@@ -407,6 +407,125 @@ h2 {
 }
 .bs-link:hover { opacity: 1; }
 
+/* ── MODE TOGGLE ───────────────────────────────────── */
+
+.mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 1.6rem;
+}
+
+.mode-segmented {
+  display: flex;
+  border: 1px solid var(--faint);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mode-opt {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  letter-spacing: 0.04em;
+  padding: 0.3rem 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  text-transform: uppercase;
+}
+
+.mode-opt:not(:last-child) {
+  border-right: 1px solid var(--faint);
+}
+
+.mode-opt.active {
+  background: var(--faint);
+  color: var(--text);
+}
+
+.mode-opt:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.mode-opt-unavailable {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mode-opt-unavailable:hover:not(.active) {
+  background: transparent;
+  color: var(--muted);
+}
+
+/* ── INFO ICON + TOOLTIP ───────────────────────────── */
+
+.info-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.info-icon {
+  font-size: 0.85rem;
+  color: var(--faint);
+  cursor: default;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.info-wrap:hover .info-icon {
+  color: var(--info);
+}
+
+.info-tooltip {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: 280px;
+  background: #111c2d;
+  border: 1px solid var(--faint);
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.info-tooltip p {
+  margin: 0 0 0.5rem;
+}
+
+.info-tooltip p:last-child {
+  margin: 0;
+}
+
+.info-tooltip strong {
+  color: var(--text);
+}
+
+.info-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--faint);
+}
+
+.info-wrap:hover .info-tooltip {
+  display: block;
+}
+
 /* ── TRANSPORT BADGES ──────────────────────────────── */
 
 .transport-badge {
