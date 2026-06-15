@@ -43,20 +43,6 @@ async function detectBackend() {
 }
 
 function renderBackendStatus() {
-  if (!backendStatusNode) return;
-  if (backendAvailable) {
-    const isCloudflare = activeBackendUrl === '/api';
-    const label = isCloudflare
-      ? 'Cloudflare Worker connected'
-      : 'Local Node.js backend connected';
-    backendStatusNode.className = 'backend-status bs-on';
-    backendStatusNode.innerHTML = `<span class="bs-dot"></span>${label}`;
-  } else {
-    backendStatusNode.className = 'backend-status bs-off';
-    backendStatusNode.innerHTML =
-      '<span class="bs-dot"></span>No backend detected'
-      + ' <a class="bs-link" href="#backend-help">How to enable</a>';
-  }
   syncModeToggle();
 }
 
@@ -777,7 +763,13 @@ const SEVERITY_RANK = { high: 0, medium: 1, low: 2 };
 function effectiveSeverity(result) {
   if (result.status === 'accessible') return result.test.severity;
   if (result.status === 'invalid') return 'high';
-  return result.severity;
+  return null; // not_enabled / restricted / unknown have no meaningful severity
+}
+
+function sortKey(result) {
+  if (result.status === 'accessible') return SEVERITY_RANK[result.test.severity] ?? 2;
+  if (result.status === 'invalid') return 3;
+  return 4;
 }
 
 function renderReport(results, report) {
@@ -806,16 +798,14 @@ function renderReport(results, report) {
   parts.push(`<p class="note">100% client-side analysis — cannot read internal GCP key policy without IAM/OAuth access.</p>`);
   summaryNode.innerHTML = parts.join('');
 
-  const sorted = [...results].sort(
-    (a, b) => (SEVERITY_RANK[effectiveSeverity(a)] ?? 2) - (SEVERITY_RANK[effectiveSeverity(b)] ?? 2)
-  );
+  const sorted = [...results].sort((a, b) => sortKey(a) - sortKey(b));
 
   apiResultsNode.innerHTML = '';
   for (const result of sorted) {
     const sev = effectiveSeverity(result);
-    const sevLabel = { high: 'HIGH', medium: 'MED', low: 'LOW' }[sev] ?? 'LOW';
+    const sevLabel = sev ? { high: 'HIGH', medium: 'MED', low: 'LOW' }[sev] : '—';
     const li = document.createElement('li');
-    li.className = `api-item ${sev}`;
+    li.className = `api-item ${sev ?? 'neutral'}`;
 
     const pocUrl = result.test.pocUrl.replace('{KEY}', maskKey(lastApiKey));
     const pocMethod = result.test.pocMethod || 'GET';
@@ -842,11 +832,15 @@ function renderReport(results, report) {
         </div>
       `;
     } else {
+      const backendHint = result.transport !== 'backend'
+        ? '<span class="cors-hint">Switch to <strong>Backend</strong> mode for full coverage on this endpoint.</span>'
+        : '';
       rawSection = `
         <div class="raw-row">
           <span class="raw-label">RESPONSE</span>
-          <span class="raw-val raw-blocked">Could not connect — CORS or network error</span>
+          <span class="raw-val raw-blocked">Could not connect — CORS or network error${backendHint ? ' &nbsp;' : ''}</span>
         </div>
+        ${backendHint ? `<div class="raw-row"><span class="raw-label"></span>${backendHint}</div>` : ''}
       `;
     }
 
@@ -856,10 +850,10 @@ function renderReport(results, report) {
 
     li.innerHTML = `
       <div class="api-head">
-        <span class="api-sev ${sev}">${sevLabel}</span>
+        <span class="api-sev ${sev ?? 'neutral'}">${sevLabel}</span>
         <span class="api-name">${escapeHtml(result.test.name)}</span>
         <span class="api-cat">${escapeHtml(result.test.category)}</span>
-        <span class="api-status ${sev}">${labelForStatus(result.status)}</span>
+        <span class="api-status ${sev ?? 'neutral'}">${labelForStatus(result.status)}</span>
       </div>
       <div class="api-impact">${escapeHtml(result.test.impact)}</div>
       <div class="api-finding">${escapeHtml(result.summary)}${result.details ? ` — ${escapeHtml(result.details)}` : ''}</div>
