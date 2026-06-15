@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#090d14"/>
+      <stop offset="100%" stop-color="#070a10"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#5fd2b1" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#5fd2b1" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <line x1="0" y1="0" x2="1200" y2="0" stroke="#1a2333" stroke-width="1"/>
+  <line x1="0" y1="630" x2="1200" y2="630" stroke="#1a2333" stroke-width="1"/>
+  <line x1="0" y1="210" x2="1200" y2="210" stroke="#1a2333" stroke-width="0.5" stroke-dasharray="6 12"/>
+  <line x1="0" y1="420" x2="1200" y2="420" stroke="#1a2333" stroke-width="0.5" stroke-dasharray="6 12"/>
+  <line x1="400" y1="0" x2="400" y2="630" stroke="#1a2333" stroke-width="0.5" stroke-dasharray="6 12"/>
+  <line x1="800" y1="0" x2="800" y2="630" stroke="#1a2333" stroke-width="0.5" stroke-dasharray="6 12"/>
+
+  <!-- Glow behind key -->
+  <ellipse cx="200" cy="315" rx="260" ry="220" fill="#5fd2b1" fill-opacity="0.06"/>
+
+  <!-- Key icon (large, left side) -->
+  <g transform="translate(80, 195)">
+    <!-- Bow (ring) -->
+    <circle cx="130" cy="120" r="105" fill="none" stroke="#5fd2b1" stroke-width="18"/>
+    <!-- Keyhole fill -->
+    <circle cx="130" cy="120" r="40" fill="#5fd2b1"/>
+    <!-- Blade -->
+    <rect x="235" y="102" width="185" height="36" rx="18" fill="#5fd2b1"/>
+    <!-- Teeth -->
+    <rect x="382" y="138" width="36" height="52" rx="14" fill="#5fd2b1"/>
+    <rect x="324" y="138" width="36" height="44" rx="14" fill="#5fd2b1"/>
+    <rect x="266" y="138" width="36" height="36" rx="14" fill="#5fd2b1"/>
+  </g>
+
+  <!-- Divider -->
+  <line x1="510" y1="140" x2="510" y2="490" stroke="#1a2333" stroke-width="1.5"/>
+
+  <!-- Text content (right side) -->
+  <!-- App name -->
+  <text x="570" y="248" font-family="ui-monospace, 'Courier New', monospace" font-size="21" fill="#5fd2b1" letter-spacing="4" font-weight="500">GCP API KEY AUDITOR</text>
+
+  <!-- Headline -->
+  <text x="570" y="320" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="52" font-weight="700" fill="#edf2f7">Test &amp; Audit</text>
+  <text x="570" y="384" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="52" font-weight="700" fill="#edf2f7">GCP API Keys</text>
+
+  <!-- Subtitle -->
+  <text x="570" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="22" fill="#8a97aa">40+ APIs checked — browser-based — free</text>
+
+  <!-- URL tag -->
+  <rect x="570" y="476" width="460" height="42" rx="8" fill="#1a2333"/>
+  <text x="590" y="502" font-family="ui-monospace, 'Courier New', monospace" font-size="17" fill="#5fd2b1" letter-spacing="1">gcpapikeyauditor.alongale.com</text>
+</svg>

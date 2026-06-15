@@ -1,0 +1,17 @@
+{
+  "name": "GCP API Key Auditor",
+  "short_name": "Key Auditor",
+  "description": "Test and audit Google Cloud API keys. Checks 40+ GCP APIs for accessibility, key restrictions, and security exposure.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#0d1421",
+  "background_color": "#080b11",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
