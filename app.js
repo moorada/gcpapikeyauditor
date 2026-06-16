@@ -8,7 +8,7 @@ const apiResultsNode = document.getElementById('api-results');
 const issuesNode = document.getElementById('issues');
 
 let discoveredProjectId = null;
-let discoveredProjectSource = null;
+let discoveredProjectTest = null;
 let lastApiKey = null;
 
 // ── Request helpers ────────────────────────────────────
@@ -727,7 +727,7 @@ form.addEventListener('submit', async (event) => {
 
   button.disabled = true;
   discoveredProjectId = null;
-  discoveredProjectSource = null;
+  discoveredProjectTest = null;
   lastApiKey = apiKey;
   hideResults();
   paintStatus('Starting exposure analysis...', 'info');
@@ -780,7 +780,7 @@ async function runTest(test, apiKey) {
       const found = extractProjectId(raw.text);
       if (found) {
         discoveredProjectId = found;
-        discoveredProjectSource = test.pocUrl ? test.pocUrl.replace('{KEY}', lastApiKey) : test.name;
+        discoveredProjectTest = test;
       }
     }
 
@@ -992,9 +992,16 @@ function renderReport(results, report) {
   ];
 
   if (discoveredProjectId) {
-    const pocLine = discoveredProjectSource
-      ? `<div class="pid-poc-row"><span class="pid-poc-label">PoC</span><code class="pid-poc-url">${escapeHtml(discoveredProjectSource)}</code></div>`
-      : '';
+    let pocLines = '';
+    if (discoveredProjectTest) {
+      const t = discoveredProjectTest;
+      const method = t.pocMethod || 'GET';
+      const url = t.pocUrl ? t.pocUrl.replace('{KEY}', lastApiKey) : t.name;
+      pocLines += `<div class="pid-poc-row"><span class="pid-poc-label">REQUEST</span><code class="pid-poc-url">${escapeHtml(method + ' ' + url)}</code></div>`;
+      if (t.pocBody) {
+        pocLines += `<div class="pid-poc-row"><span class="pid-poc-label">BODY</span><code class="pid-poc-url">${escapeHtml(t.pocBody)}</code></div>`;
+      }
+    }
     parts.push(`
       <div class="pid-alert">
         <div class="pid-main-row">
@@ -1002,7 +1009,7 @@ function renderReport(results, report) {
           <code class="pid-value">${escapeHtml(discoveredProjectId)}</code>
         </div>
         <span class="pid-desc">Leaked via API error response — project-scoped probes were automatically added.</span>
-        ${pocLine}
+        ${pocLines}
       </div>
     `);
   }
