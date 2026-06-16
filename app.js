@@ -9,6 +9,7 @@ const issuesNode = document.getElementById('issues');
 
 let discoveredProjectId = null;
 let discoveredProjectTest = null;
+let discoveredProjectRaw = null;
 let lastApiKey = null;
 
 // ── Request helpers ────────────────────────────────────
@@ -728,6 +729,7 @@ form.addEventListener('submit', async (event) => {
   button.disabled = true;
   discoveredProjectId = null;
   discoveredProjectTest = null;
+  discoveredProjectRaw = null;
   lastApiKey = apiKey;
   hideResults();
   paintStatus('Starting exposure analysis...', 'info');
@@ -781,6 +783,7 @@ async function runTest(test, apiKey) {
       if (found) {
         discoveredProjectId = found;
         discoveredProjectTest = test;
+        discoveredProjectRaw = raw;
       }
     }
 
@@ -1000,6 +1003,10 @@ function renderReport(results, report) {
       pocLines += `<div class="pid-poc-row"><span class="pid-poc-label">REQUEST</span><code class="pid-poc-url">${escapeHtml(method + ' ' + url)}</code></div>`;
       if (t.pocBody) {
         pocLines += `<div class="pid-poc-row"><span class="pid-poc-label">BODY</span><code class="pid-poc-url">${escapeHtml(t.pocBody)}</code></div>`;
+      }
+      if (discoveredProjectRaw) {
+        pocLines += `<div class="pid-poc-row"><span class="pid-poc-label">RESPONSE</span><code class="pid-poc-url">${escapeHtml(String(discoveredProjectRaw.statusCode))}</code></div>`;
+        pocLines += `<div class="pid-poc-row pid-poc-row-pre"><span class="pid-poc-label">DATA</span><pre class="pid-poc-pre">${highlightBody(discoveredProjectRaw.text)}</pre></div>`;
       }
     }
     parts.push(`

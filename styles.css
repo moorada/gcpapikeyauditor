@@ -253,6 +253,22 @@ button:disabled {
   line-height: 1.5;
 }
 
+.pid-poc-row-pre {
+  align-items: start;
+}
+
+.pid-poc-pre {
+  margin: 0;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.73rem;
+  color: var(--muted);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
 /* ── RESULT SECTIONS ───────────────────────────────── */
 
 .result-section {
