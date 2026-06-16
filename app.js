@@ -956,7 +956,9 @@ function buildReport(results) {
 
 function calculateGlobalRisk(results, issues) {
   if (issues.some((i) => i.level === 'high')) return 'high';
-  if (results.filter((r) => r.status === 'accessible').length >= 2) return 'medium';
+  const accessibleCount = results.filter((r) => r.status === 'accessible').length;
+  if (accessibleCount >= 2) return 'medium';
+  if (accessibleCount === 0 && !issues.some((i) => i.level === 'medium')) return 'none';
   return 'low';
 }
 
@@ -977,7 +979,7 @@ function sortKey(result) {
 }
 
 function renderReport(results, report) {
-  const riskLabel = { high: 'High Risk', medium: 'Medium Risk', low: 'Low Risk' }[report.risk];
+  const riskLabel = { high: 'High Risk', medium: 'Medium Risk', low: 'Low Risk', none: 'No exposure found' }[report.risk];
 
   const parts = [
     `<div class="risk-headline ${report.risk}">${riskLabel}</div>`,
