@@ -695,18 +695,13 @@ function maskKey(key) {
   return key.slice(0, 8) + '•••';
 }
 
-function highlightBody(text, key) {
+function highlightBody(text) {
   if (!text) return '<em style="opacity:.5">no response body</em>';
 
   let body = text.length > 3000 ? text.slice(0, 3000) + '\n…[truncated]' : text;
   try { body = JSON.stringify(JSON.parse(body), null, 2); } catch {}
 
   body = escapeHtml(body);
-
-  if (key) {
-    const safeKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    body = body.replace(new RegExp(safeKey, 'g'), maskKey(key));
-  }
 
   body = body.replace(
     /\b(API_KEY_SERVICE_BLOCKED|REQUEST_DENIED|PERMISSION_DENIED|SERVICE_DISABLED|INVALID_KEY|ACCESS_DENIED)\b/g,
@@ -785,7 +780,7 @@ async function runTest(test, apiKey) {
       const found = extractProjectId(raw.text);
       if (found) {
         discoveredProjectId = found;
-        discoveredProjectSource = test.pocUrl ? test.pocUrl.replace('{KEY}', maskKey(lastApiKey)) : test.name;
+        discoveredProjectSource = test.pocUrl ? test.pocUrl.replace('{KEY}', lastApiKey) : test.name;
       }
     }
 
@@ -854,7 +849,7 @@ function classifyFromMessage(message, statusCode, reasons = []) {
     return { status: 'not_enabled', severity: 'low', summary: 'Requires OAuth — not testable with an API key alone', details: safeText(message) };
   }
 
-  if (text.includes('api key not valid') || text.includes('api_key_invalid') || text.includes('badrequest')) {
+  if (text.includes('api key not valid') || text.includes('api key is invalid') || text.includes('api_key_invalid') || text.includes('badrequest')) {
     return { status: 'invalid', severity: 'high', summary: 'API key appears invalid', details: safeText(message) };
   }
 
@@ -1022,17 +1017,17 @@ function renderReport(results, report) {
     const li = document.createElement('li');
     li.className = `api-item ${sev ?? 'neutral'}`;
 
-    const pocUrl = result.test.pocUrl.replace('{KEY}', maskKey(lastApiKey));
+    const pocUrl = result.test.pocUrl.replace('{KEY}', lastApiKey);
     const pocMethod = result.test.pocMethod || 'GET';
     const pocBody = result.test.pocBody || null;
-    const pocNote = result.test.pocNote ? result.test.pocNote.replace('{KEY}', maskKey(lastApiKey)) : null;
+    const pocNote = result.test.pocNote ? result.test.pocNote.replace('{KEY}', lastApiKey) : null;
 
     let rawSection = '';
     if (result.raw) {
       const isBinary = result.test.binaryResponse && result.raw.ok;
       const dataContent = isBinary
         ? '<em class="raw-note">Binary image content — access confirmed by HTTP status above</em>'
-        : `<pre class="raw-pre">${highlightBody(result.raw.text, lastApiKey)}</pre>`;
+        : `<pre class="raw-pre">${highlightBody(result.raw.text)}</pre>`;
       rawSection = `
         <div class="raw-row">
           <span class="raw-label">RESPONSE</span>
